@@ -1,0 +1,13 @@
+# Core libraries
+numpy==1.25.2
+pandas==2.0.3
+requests==2.31.0
+python-dotenv==1.0.0
+scipy==1.10.1
+
+# Visualization
+matplotlib==3.7.2
+seaborn==0.12.2
+
+# Testing
+pytest==7.4.0

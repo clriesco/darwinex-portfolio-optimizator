@@ -1,0 +1,25 @@
+# Ignore Python cache
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Environment files
+.env
+
+# Virtual environment folders
+venv/
+.venv/
+env/
+.venv/
+
+# Data files
+data/raw/
+data/processed/
+
+# OS-specific
+.DS_Store
+
+# Others
+*.log
+
+*.egg-info/
