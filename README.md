@@ -55,6 +55,15 @@ This project provides a **SOLID**-structured application to:
     
     > You can obtain your Darwinex Info API key [here](https://www.darwinex.com/es/data/darwin-api).
     
+5.  _(Optional)_ Throttling:  
+    If you want to respect the **10 requests/min** limit, modify existing env variable.
+    
+    ```bash
+    DARWINEX_THROTTLING_SECONDS=6.0
+    ```
+    
+    By default, it's `6.0` if not specified.
+    
 
 Usage
 -----
@@ -63,17 +72,32 @@ Usage
 python -m src.cli.main --help
 ```
 
-### 1\. Download data
+### download
+
+**Usage**:
 
 ```bash
 python -m src.cli.main download \
-  --darwins PXQ JBC \
+  -d PXQ JBC \
   --start 2022-01-01 \
   --end 2022-06-30 \
   --save-path data/raw
 ```
 
-### 2\. Calculate fees in data/raw
+**Arguments**:
+
+*   `-d/--darwins`: **Required**. Space-separated DARWIN symbols.
+*   `-s/--start`: Optional. Start date in `YYYY-MM-DD`. Defaults to `2022-01-01`.
+*   `-e/--end`: Optional. End date in `YYYY-MM-DD`. Defaults to today.
+*   `--save-path`: Optional. Defaults to `data/raw`.
+
+**Notes**:
+
+*   If environment variable `DARWINEX_THROTTLING_SECONDS` is set (e.g. `6.0`), the script will pause that many seconds between each request to avoid surpassing 10 req/min.
+
+### calculate-fees
+
+**Usage**:
 
 ```bash
 python -m src.cli.main calculate-fees \
@@ -82,22 +106,43 @@ python -m src.cli.main calculate-fees \
   --processed-path data/processed
 ```
 
-*   This reads each CSV in `data/raw`, applies a daily approach to subtract fees from positive returns, and saves the resulting prices to `data/processed`.
+**Arguments**:
 
-### 3\. Generate best portfolios
+*   `--fee-rate`: Optional. Default=0.2 (20%). Subtracted from daily positive returns.
+*   `--raw-path`: Optional. Default=`data/raw`. Directory containing the original CSV files.
+*   `--processed-path`: Optional. Default=`data/processed`. Directory to store the new CSV files with fees subtracted.
+
+### best-portfolios
+
+**Usage**:
 
 ```bash
 python -m src.cli.main best-portfolios \
-  --darwins PXQ JBC \
+  -d PXQ JBC \
   --start 2022-01-01 \
   --end 2022-06-30 \
   --save-path data/processed \
   --num-portfolios 5 \
-  --plot-individual
+  --plot-individual \
+  --max-darwins 8
 ```
 
-*   This **does not** apply performance fees. Leverage is still optional (`--leverage 2.0`).
-*   Assets with <1 year of data or total return ≤ 0 are filtered out.
+**Arguments**:
+
+*   `-d/--darwins`: Optional. Space-separated symbols. If not provided, it discovers them from CSV in `--save-path`.
+*   `-s/--start`: Optional. Default=`2022-01-01`.
+*   `-e/--end`: Optional. Default=today.
+*   `--save-path`: Optional. Default=`data/processed`. Where to read CSV files from.
+*   `-x/--num-portfolios`: Optional. Number of distinct solutions to keep. Default=10.
+*   `--leverage`: Optional. Default=1.0. Scales daily returns by this factor.
+*   `--plot-individual`: If present, also plot each asset's equity curve.
+*   `--equal-weights`: If present, tries to find the best subset under equal weights approach.
+*   `--max-darwins`: Optional. Maximum number of assets allowed in the final portfolio. If omitted, no limit.
+
+**Notes**:
+
+*   This subcommand does **not** apply performance fees in the optimization or final equity. It is assumed you have already subtracted fees with `calculate-fees`.
+
 
 Project Structure
 -----------------

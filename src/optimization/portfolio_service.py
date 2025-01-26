@@ -53,7 +53,8 @@ class PortfolioService:
         plot_individual=False,
         save_path=None,
         leverage=None,
-        equal_weights=False
+        equal_weights=False,
+        max_darwins=None
     ):
         """
         Main entry point to generate best portfolios from data.
@@ -66,6 +67,7 @@ class PortfolioService:
         :param save_path: Directory with CSV files, default='data/processed'.
         :param leverage: Leverage factor, default=1.0
         :param equal_weights: If True, find best subset for eq-wgts instead of distinct optimization.
+        :param max_darwins: If not None, limit the final portfolio to at most `max_darwins` assets.
         """
         if not start:
             start = "2022-01-01"
@@ -113,13 +115,25 @@ class PortfolioService:
 
         # If user wants best subset with eq weights
         if equal_weights:
-            print("[INFO] Finding best subset under equal weights (no fees).")
+            print("[INFO] Finding best subset under equal weights.")
             best_subset = self._generate_equal_weights_best_subset(returns_df, final_symbols)
             if not best_subset or len(best_subset) == 0:
                 print("[WARN] No subset found for equal weights.")
                 return
 
-            print(f"[INFO] Best subset for equal weights: {best_subset}")
+            # If max_darwins is set, limit the subset
+            if max_darwins is not None and len(best_subset) > max_darwins:
+                # Chose a criterion to limit the subset
+                # for example, by average returns
+                print(f"[INFO] best_subset has {len(best_subset)} assets, limiting to {max_darwins} by average returns.")
+                mean_map = {}
+                for sym in best_subset:
+                    mean_map[sym] = returns_df[sym].mean()
+                # Order by mean return
+                sorted_symbols = sorted(best_subset, key=lambda s: mean_map[s], reverse=True)
+                best_subset = sorted_symbols[:max_darwins]
+
+            print(f"[INFO] Final subset for eq-wgts: {best_subset}")
             eq_w = np.ones(len(best_subset)) / len(best_subset)
             self._evaluate_and_plot_single_portfolio(
                 eq_w, best_subset, returns_df, mc, plotter, plot_individual, tag="Best Equal-Weights Subset"
@@ -131,6 +145,32 @@ class PortfolioService:
         if len(best_portfolios) == 0:
             print("[WARN] No distinct portfolios found.")
             return
+        
+        if max_darwins is not None:
+            print(f"[INFO] Limiting final portfolios to at most {max_darwins} assets.")
+            filtered_results = []
+            for sharpe_val, w in best_portfolios:
+                # Count how many assets have weight>1e-4
+                active_assets_idx = [i for i, val in enumerate(w) if val > 1e-4]
+                if len(active_assets_idx) <= max_darwins:
+                    filtered_results.append((sharpe_val, w))
+                else:
+                    # Reassign weights to top max_darwins but keep sharpe ratio
+                    w_copy = w.copy()
+                    # Order by weight
+                    sorted_idx = sorted(range(len(w)), key=lambda i: w[i], reverse=True)
+                    keep_idx = sorted_idx[:max_darwins]
+                    zero_idx = sorted_idx[max_darwins:]
+                    for i in zero_idx:
+                        w_copy[i] = 0.0
+                    # Rebalance
+
+                    total_sum = sum(w_copy)
+                    if total_sum > 0:
+                        w_copy = w_copy / total_sum
+
+                    filtered_results.append((sharpe_val, w_copy))
+            best_portfolios = filtered_results
 
         print(f"Top {len(best_portfolios)} DISTINCT portfolios:")
         for i, (sharpe_val, w) in enumerate(best_portfolios, start=1):
